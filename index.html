@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Balloon ABC Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        #pump-btn {
+            position: fixed;
+            bottom: 10px;
+            left: 50%;
+            transform:translateX(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+        }
+        #pump-img {
+            width: 400px;
+            height: auto;
+            transition: transform 0.2s; 
+        }
+        
+        #pump-img:active {
+            transform: scale(0.95); 
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <button id="pump-btn">
+        <img src="./Graphics (3) (2)/Symbol 28.png" alt="Pump" id="pump-img">
+    </button>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const pumpButton = document.getElementById('pump-btn');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        const balloonImages = {
+            'A': new Image(),
+            'B': new Image(),
+            'C': new Image()
+        };
+
+        balloonImages.A.src = './Graphics (3) (2)/Symbol 100003.png';
+        balloonImages.B.src = './Graphics (3) (2)/Symbol 100002.png';
+        balloonImages.C.src = './Graphics (3) (2)/Symbol 100007.png';
+
+        let balloons = [];
+        let letterIndex = 0;
+        const letters = ['A', 'B', 'C'];
+        let maxBalloons = 10;
+        let activeBalloons = 0;
+        let poppedBalloons = 0;
+        
+        // Update balloon creation with limit check
+        function createBalloon(x, y, letter) {
+            if (balloons.length >= maxBalloons) return null;
+            
+            activeBalloons++;
+            return {
+                x: x,
+                y: y,
+                letter: letter,
+                scale: 0.1,
+                maxScale: 0.4,
+                burst: false,
+                speedX: 0,
+                speedY: 0,
+                inflating: true,
+                growthSpeed: 0.005
+            };
+        }
+         
+        function updateBalloon(balloon) {
+            if (balloon.inflating) {
+                // Grow the balloon
+                balloon.scale += balloon.growthSpeed;
+                
+                if (balloon.scale >= balloon.maxScale) {
+                    balloon.inflating = false;
+                    // Start moving with random speed
+                    balloon.speedX = (Math.random() - 0.5) * 3;
+                    balloon.speedY = (Math.random() - 0.5) * 3;
+                }
+            } else {
+                // Simple random movement
+                balloon.x += balloon.speedX;
+                balloon.y += balloon.speedY;
+        
+                // Bounce on edges
+                if (balloon.x <= 0 || balloon.x >= canvas.width) {
+                    balloon.speedX *= -1;
+                }
+                if (balloon.y <= 0 || balloon.y >= canvas.height) {
+                    balloon.speedY *= -1;
+                }
+            }
+        }
+        
+        function drawBalloon(balloon) {
+            if (!balloon.burst) {
+                ctx.save();
+                ctx.translate(balloon.x, balloon.y);
+                ctx.scale(balloon.scale, balloon.scale);
+
+                const img = balloonImages[balloon.letter];
+                if (img.complete) {
+                    ctx.drawImage(
+                        img,
+                        -img.width / 2,
+                        -img.height / 2,
+                        img.width,
+                        img.height
+                    );
+                }
+
+                ctx.restore();
+            }
+        }
+
+        let autoPumpInterval;
+
+        function startAutoPump() {
+            autoPumpInterval = setInterval(() => {
+                if (balloons.length >= maxBalloons) return;
+                
+                const pumpRect = pumpButton.getBoundingClientRect();
+                const letter = letters[letterIndex % letters.length];
+                const x = pumpRect.left + (pumpRect.width / 2);
+                const y = pumpRect.top - 50;
+                
+                const newBalloon = createBalloon(x, y, letter);
+                if (newBalloon) {
+                    balloons.push(newBalloon);
+                    letterIndex++;
+                }
+        
+                // Animate pump button
+                pumpButton.style.transform = 'translateX(-50%) scale(0.95)';
+                setTimeout(() => {
+                    pumpButton.style.transform = 'translateX(-50%) scale(1)';
+                }, 100);
+            }, 3000);
+        }
+        
+        
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                startAutoPump();
+            }, 1000);
+        });
+
+        canvas.addEventListener('click', (event) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = event.clientX - rect.left;
+            const mouseY = event.clientY - rect.top;
+
+            for (let i = balloons.length - 1; i >= 0; i--) {
+                const balloon = balloons[i];
+                const img = balloonImages[balloon.letter];
+                const hitArea = (img.width * balloon.scale) / 2;
+                
+                const distance = Math.sqrt(
+                    Math.pow(mouseX - balloon.x, 2) + 
+                    Math.pow(mouseY - balloon.y, 2)
+                );
+
+                if (distance < hitArea && !balloon.burst) {
+                    balloons.splice(i, 1);
+                    break;  
+                }
+            }
+        });
+
+        // Main game loop
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            balloons.forEach(balloon => {
+                updateBalloon(balloon);
+                drawBalloon(balloon);
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        Promise.all(Object.values(balloonImages).map(img => {
+            return new Promise((resolve) => {
+                img.onload = resolve;
+            });
+        })).then(() => {
+            animate();
+        });
+    </script>
+</body>
+</html>
